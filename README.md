@@ -1,13 +1,18 @@
 # whosonfirst2pgsql
 
 ### NAME:
-whosonfirst2pgsql - A new cli application
+w2pgsql
 
 ### USAGE:
-whosonfirst2pgsql [global options] command [command options] [arguments...]
+w2pgsql [global options] command [command options] [arguments...]
 
 #### DESCRIPTION:
-Convert data to pgsql
+Read Administrative Boundaries from https://geocode.earth/data/whosonfirst in TAR bundles format and transpose that data into postgresql.
+
+Before running this tool the download needs to be decompressed using bz2:
+```bash
+bzip2 -d whosonfirst-data-admin-latest.tar.bz2
+```
 
 ### COMMANDS:
 help, h  Shows a list of commands or help for one command
@@ -29,3 +34,5 @@ help, h  Shows a list of commands or help for one command
 |--schema value              |Use PostgreSQL schema SCHEMA for all tables, indexes, and functions in the pgsql output (default is no schema, i.e. the public schema is used). (default: "public")|
 |--help, -h                  |show help (default: false)|
 
+### RELEASES
+Releases are available for both Linux and Windows
