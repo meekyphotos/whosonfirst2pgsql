@@ -177,7 +177,6 @@ func scanTarFile(channel chan []byte, db *DbConn, config *Config) error {
 		}
 	}
 	db.written.ChangeMax64(db.read)
-	fmt.Println("Finished reading data from file: ", db.read, " items")
 	close(channel)
 	return nil
 }

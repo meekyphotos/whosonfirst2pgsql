@@ -12,22 +12,19 @@ type PasswordProvider interface {
 	ReadPassword() (string, error)
 }
 type Config struct {
-	File                       string
-	Create                     bool
-	DbName                     string
-	UserName                   string
-	Password                   string
-	Host                       string
-	Port                       int
-	UseLatLng                  bool
-	UseGeom                    bool
-	TableName                  string
-	InclKeyValues              bool
-	ExcludeColumnFromKeyValues bool
-	UseJson                    bool
-	MatchOnly                  bool
-	Schema                     string
-	WorkerCount                int
+	File          string
+	Create        bool
+	DbName        string
+	UserName      string
+	Password      string
+	Host          string
+	Port          int
+	UseLatLng     bool
+	UseGeom       bool
+	TableName     string
+	InclKeyValues bool
+	Schema        string
+	WorkerCount   int
 }
 type Loader struct {
 	PasswordProvider PasswordProvider
@@ -69,15 +66,8 @@ func (t *Loader) DoLoad(context *cli.Context) error {
 		t.Config.UseGeom = false
 	}
 	t.Config.TableName = context.String("p")
-	t.Config.InclKeyValues =
-		context.Bool("hstore") ||
-			context.Bool("hstore-all") ||
-			context.Bool("json") ||
-			context.Bool("json-all")
+	t.Config.InclKeyValues = context.Bool("json")
 
-	t.Config.ExcludeColumnFromKeyValues = context.Bool("hstore") || context.Bool("json")
-	t.Config.UseJson = context.Bool("json") || context.Bool("json-all")
-	t.Config.MatchOnly = context.Bool("match-only")
 	t.Config.Schema = context.String("schema")
 	t.Config.TableName = context.String("t")
 	t.Config.WorkerCount = context.Int("workers")

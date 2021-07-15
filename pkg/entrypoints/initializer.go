@@ -24,12 +24,7 @@ func InitApp(loader *commands.Loader) *cli.App {
 			&cli.BoolFlag{Name: "latlong", Value: false, Usage: "Store coordinates in degrees of latitude & longitude."},
 			&cli.StringFlag{Name: "t", Aliases: []string{"table"}, Value: "planet_data", Usage: "Output table name"},
 
-			&cli.BoolFlag{Name: "k", Aliases: []string{"hstore"}, Value: false, Usage: "Add tags without column to an additional hstore (key/value) column in the database tables."},
-			&cli.BoolFlag{Name: "j", Aliases: []string{"hstore-all"}, Value: false, Usage: "Add all tags to an additional hstore (key/value) column in the database tables."},
-			&cli.BoolFlag{Name: "json", Value: false, Usage: "Add tags without column to an additional json (key/value) column in the database tables."},
-			&cli.BoolFlag{Name: "json-all", Value: false, Usage: "Add all tags to an additional json (key/value) column in the database tables."},
-
-			&cli.BoolFlag{Name: "match-only", Value: false, Usage: "Only keep objects that have a value in at least one of the non-key value columns."},
+			&cli.BoolFlag{Name: "j", Aliases: []string{"json"}, Value: false, Usage: "Add tags without column to an additional json (key/value) column in the database tables."},
 
 			&cli.StringFlag{Name: "schema", Value: "public", Usage: "Use PostgreSQL schema SCHEMA for all tables, indexes, and functions in the pgsql output (default is no schema, i.e. the public schema is used)."},
 		},

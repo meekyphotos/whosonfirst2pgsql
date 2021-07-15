@@ -86,47 +86,10 @@ func TestOutputFormat(t *testing.T) {
 	}
 
 	app := InitApp(&underTest)
-	err := app.Run([]string{"app", "-d", "db_test", "-p", "tbl", "-k", "hello"})
+	err := app.Run([]string{"app", "-d", "db_test", "-p", "tbl", "-j", "hello"})
 	assert.Nil(t, err)
 
 	assert.Equal(t, true, underTest.Config.UseGeom)
 	assert.Equal(t, "tbl", underTest.Config.TableName)
 	assert.Equal(t, true, underTest.Config.InclKeyValues)
-	assert.Equal(t, true, underTest.Config.ExcludeColumnFromKeyValues)
-	assert.Equal(t, false, underTest.Config.UseJson)
-}
-
-func TestOutputFormatHStoreAll(t *testing.T) {
-	underTest := commands.Loader{
-		Runner:           MockRunner{},
-		PasswordProvider: MockPasswordReader{},
-	}
-
-	app := InitApp(&underTest)
-	err := app.Run([]string{"app", "-d", "db_test", "-j", "hello"})
-	assert.Nil(t, err)
-
-	assert.Equal(t, true, underTest.Config.UseGeom)
-	assert.Equal(t, true, underTest.Config.InclKeyValues)
-	assert.Equal(t, false, underTest.Config.ExcludeColumnFromKeyValues)
-	assert.Equal(t, false, underTest.Config.UseJson)
-	assert.Equal(t, false, underTest.Config.MatchOnly)
-}
-
-func TestOutputFormatJsonbAll(t *testing.T) {
-	underTest := commands.Loader{
-		Runner:           MockRunner{},
-		PasswordProvider: MockPasswordReader{},
-	}
-
-	app := InitApp(&underTest)
-	err := app.Run([]string{"app", "-d", "db_test", "--json-all", "--match-only", "--schema", "custom", "hello"})
-	assert.Nil(t, err)
-
-	assert.Equal(t, true, underTest.Config.UseGeom)
-	assert.Equal(t, true, underTest.Config.InclKeyValues)
-	assert.Equal(t, false, underTest.Config.ExcludeColumnFromKeyValues)
-	assert.Equal(t, true, underTest.Config.UseJson)
-	assert.Equal(t, true, underTest.Config.MatchOnly)
-	assert.Equal(t, "custom", underTest.Config.Schema)
 }
