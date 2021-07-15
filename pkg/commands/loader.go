@@ -1,10 +1,11 @@
 package commands
 
 import (
-	"github.com/urfave/cli/v2"
-	"golang.org/x/crypto/ssh/terminal"
 	"log"
 	"os"
+
+	"github.com/urfave/cli/v2"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 type PasswordProvider interface {
@@ -26,6 +27,7 @@ type Config struct {
 	UseJson                    bool
 	MatchOnly                  bool
 	Schema                     string
+	WorkerCount                int
 }
 type Loader struct {
 	PasswordProvider PasswordProvider
