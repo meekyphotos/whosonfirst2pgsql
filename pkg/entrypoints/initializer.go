@@ -18,6 +18,7 @@ func InitApp(loader *commands.Loader) *cli.App {
 			&cli.BoolFlag{Name: "W", Aliases: []string{"password"}, Value: false, Usage: "Force password prompt."},
 			&cli.StringFlag{Name: "H", Aliases: []string{"host"}, Value: "localhost", Usage: "Database server hostname or unix domain socket location."},
 			&cli.IntFlag{Name: "P", Aliases: []string{"port"}, Value: 5432, Usage: "Database server port."},
+			&cli.IntFlag{Name: "workers", Value: 4, Usage: "Number of workers"},
 
 			// OUTPUT FORMAT
 			&cli.BoolFlag{Name: "latlong", Value: false, Usage: "Store coordinates in degrees of latitude & longitude."},

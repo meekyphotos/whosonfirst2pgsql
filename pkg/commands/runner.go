@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/godruoyi/go-snowflake"
+	"github.com/schollz/progressbar/v3"
 	"io"
 	"log"
 	"os"
@@ -23,58 +25,79 @@ type Runner interface {
 type CmdRunner struct{}
 
 func (c *CmdRunner) Run(config *Config) error {
+	connStr := fmt.Sprintf("user=%s dbname=%s password=%s host=%s sslmode=disable",
+		config.UserName, config.DbName, config.Password, config.Host)
+
+	conn, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return err
+	}
 	db := DbConn{
 		cfg:  config,
-		conn: &sql.DB{},
+		conn: conn,
+		written: progressbar.Default(
+			-1,
+			"Writing",
+		),
 	}
 
-	db.InitTable()
+	defer func(conn *sql.DB) {
+		err := conn.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(conn)
+	err = db.InitTable()
+	if err != nil {
+		return err
+	}
 
 	log.Println("Start reading... ", config.File)
-	pool := fastjson.ParserPool{}
 	contentChannel := make(chan []byte, 10000)
 	reqChannel := make(chan Req, 10000)
-	var jsonWorkers sync.WaitGroup
-	var pgWorkers sync.WaitGroup
 	var localError error
-	for i := 0; i < config.WorkerCount; i++ {
-		jsonWorkers.Add(1)
-		go func(index int) {
-			log.Println("Start Worker #", index, "...")
-			err := jsonParser(contentChannel, reqChannel, &pool)
-			if err != nil {
-				localError = err
-			}
-			jsonWorkers.Done()
-			log.Println("Worker #", index, " job completed")
-		}(i)
-	}
-	batchedRequests := batchRequest(reqChannel, 2500, 30*time.Second)
-	for i := 0; i < config.WorkerCount; i++ {
-		pgWorkers.Add(1)
-		go func(index int) {
-			log.Println("Start DB Worker #", index, "...")
-			err := dbLoader(batchedRequests, &db)
-			if err != nil {
-				localError = err
-			}
-			pgWorkers.Done()
-			log.Println("Worker DB #", index, " job completed")
-		}(i)
-	}
-
 	go func() {
-		err := scanTarFile(contentChannel, config)
+		err := scanTarFile(contentChannel, &db, config)
 		if err != nil {
 			localError = err
 		}
 	}()
 
+	pool := fastjson.ParserPool{}
+
+	var jsonWorkers sync.WaitGroup
+	var pgWorkers sync.WaitGroup
+
+	for i := 0; i < config.WorkerCount; i++ {
+		jsonWorkers.Add(1)
+		go func(index int) {
+			err := jsonParser(contentChannel, reqChannel, &pool)
+			if err != nil {
+				localError = err
+			}
+			jsonWorkers.Done()
+		}(i)
+	}
+	batchedRequests := batchRequest(reqChannel, 10000, time.Second)
+
+	pgWorkers.Add(1)
+	go func() {
+		err := dbLoader(batchedRequests, &db)
+		if err != nil {
+			localError = err
+		}
+		pgWorkers.Done()
+	}()
+
 	jsonWorkers.Wait()
+	close(reqChannel)
 	pgWorkers.Wait()
-	if localError != nil {
+	if localError == nil {
 		log.Println("Creating index")
-		db.CreateIndexes()
+		err := db.CreateIndexes()
+		if err != nil {
+			return err
+		}
 	}
 	return localError
 }
@@ -116,7 +139,7 @@ func batchRequest(values <-chan Req, maxItems int, maxTimeout time.Duration) cha
 	return batches
 }
 
-func scanTarFile(channel chan []byte, config *Config) error {
+func scanTarFile(channel chan []byte, db *DbConn, config *Config) error {
 	open, err := os.Open(config.File)
 	if err != nil {
 		return err
@@ -147,13 +170,18 @@ func scanTarFile(channel chan []byte, config *Config) error {
 			}
 
 			channel <- content
+			db.read++
+			if db.read%1000 == 0 {
+				db.written.ChangeMax64(db.read)
+			}
 		}
 	}
+	db.written.ChangeMax64(db.read)
 	close(channel)
 	return nil
 }
 
-func jsonParser(channel <-chan []byte, reqChannel chan Req, pool *fastjson.ParserPool) error {
+func jsonParser(channel chan []byte, reqChannel chan Req, pool *fastjson.ParserPool) error {
 
 	for {
 		select {
@@ -170,12 +198,11 @@ func jsonParser(channel <-chan []byte, reqChannel chan Req, pool *fastjson.Parse
 			reqChannel <- req
 			pool.Put(parser)
 		default:
-			return nil
 		}
 	}
 }
 
-func dbLoader(channel <-chan []Req, db *DbConn) error {
+func dbLoader(channel chan []Req, db *DbConn) error {
 	for {
 		select {
 		case content := <-channel:
@@ -187,7 +214,6 @@ func dbLoader(channel <-chan []Req, db *DbConn) error {
 				return err
 			}
 		default:
-			return nil
 		}
 	}
 }
@@ -212,10 +238,13 @@ type DbConn struct {
 	conn         *sql.DB
 	cfg          *Config
 	tableColumns []string
+	read         int64
+	written      *progressbar.ProgressBar
 }
 
 var fieldType = map[string]string{
-	"id":              "int",
+	"id":              "bigint",
+	"wof_id":          "bigint",
 	"latitude":        "double precision",
 	"longitude":       "double precision",
 	"continent_id":    "bigint",
@@ -231,6 +260,7 @@ var fieldType = map[string]string{
 }
 var fields = []string{
 	"id",
+	"wof_id",
 	"continent_id",
 	"country_id",
 	"country_code",
@@ -258,12 +288,12 @@ func (db *DbConn) InitTable() error {
 	}
 
 	if db.cfg.Create {
-		_, err := txn.Exec("DROP IF EXISTS " + db.cfg.Schema + "." + db.cfg.TableName)
+		_, err := txn.Exec("DROP TABLE IF EXISTS " + db.cfg.Schema + "." + db.cfg.TableName)
 		if err != nil {
 			return err
 		}
 	}
-	db.tableColumns = make([]string, 15)
+	db.tableColumns = make([]string, 0)
 	db.tableColumns = append(db.tableColumns, fields...)
 	if db.cfg.InclKeyValues {
 		db.tableColumns = append(db.tableColumns, "metadata")
@@ -292,7 +322,8 @@ func (db *DbConn) InitTable() error {
 		}
 	}
 	stmt.WriteString("\n)")
-	_, err = txn.Exec(stmt.String())
+	sql := stmt.String()
+	_, err = txn.Exec(sql)
 	if err != nil {
 		return txn.Rollback()
 	}
@@ -316,7 +347,7 @@ func (db *DbConn) ProcessRequest(reqs []Req) error {
 	if err != nil {
 		return err
 	}
-	stmt, err := txn.Prepare(pq.CopyIn(db.cfg.Schema+"."+db.cfg.TableName,
+	stmt, err := txn.Prepare(pq.CopyIn(db.cfg.TableName,
 		db.tableColumns...,
 	))
 	if err != nil {
@@ -327,6 +358,8 @@ func (db *DbConn) ProcessRequest(reqs []Req) error {
 		for i, f := range db.tableColumns {
 			switch f {
 			case "id":
+				vals[i] = snowflake.ID()
+			case "wof_id":
 				vals[i] = r.id
 			case "latitude":
 				vals[i] = r.latitude
@@ -346,13 +379,13 @@ func (db *DbConn) ProcessRequest(reqs []Req) error {
 				vals[i] = r.regionId
 			case "preferred_names":
 				prefNames, _ := json.Marshal(r.preferredNames)
-				vals[i] = prefNames
+				vals[i] = string(prefNames)
 			case "variant_names":
 				variantNames, _ := json.Marshal(r.variantNames)
-				vals[i] = variantNames
+				vals[i] = string(variantNames)
 			case "metadata":
 				metadata, _ := json.Marshal(r.metadata)
-				vals[i] = metadata
+				vals[i] = string(metadata)
 			case "latlng":
 				if r.latitude != 0 && r.longitude != 0 {
 					vals[i] = fmt.Sprintf("SRID=4326;POINT(%f %f)", r.latitude, r.longitude)
@@ -366,5 +399,6 @@ func (db *DbConn) ProcessRequest(reqs []Req) error {
 	if err != nil {
 		return err
 	}
+	_ = db.written.Add(len(reqs))
 	return txn.Commit()
 }

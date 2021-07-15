@@ -58,6 +58,8 @@ func (t *Loader) DoLoad(context *cli.Context) error {
 		log.Println("Now, please type in the password (mandatory): ")
 		pwd, _ := t.PasswordProvider.ReadPassword()
 		t.Config.Password = pwd
+	} else {
+		t.Config.Password = "mysecretpassword"
 	}
 	t.Config.Host = context.String("H")
 	t.Config.Port = context.Int("P")
@@ -77,5 +79,7 @@ func (t *Loader) DoLoad(context *cli.Context) error {
 	t.Config.UseJson = context.Bool("json") || context.Bool("json-all")
 	t.Config.MatchOnly = context.Bool("match-only")
 	t.Config.Schema = context.String("schema")
+	t.Config.TableName = context.String("t")
+	t.Config.WorkerCount = context.Int("workers")
 	return t.Runner.Run(&t.Config)
 }
