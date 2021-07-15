@@ -196,10 +196,10 @@ type Req struct {
 	id             int64
 	latitude       float64
 	longitude      float64
-	areaSquareM    float64
 	countryCode    string
 	preferredNames map[string]string
 	variantNames   map[string]string
+	macroregionId  int64
 	continentId    int64
 	countryId      int64
 	countyId       int64
